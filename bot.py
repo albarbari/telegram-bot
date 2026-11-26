@@ -4,8 +4,15 @@ import threading
 
 from flask import Flask
 from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    MessageHandler,
+    ContextTypes,
+    filters,
+)
 from waitress import serve
+
 
 BOT_TOKEN = "".join(os.environ.get("BOT_TOKEN", "").split())
 
@@ -16,20 +23,46 @@ telegram_app = Application.builder().token(BOT_TOKEN).build()
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "🎬 Welcome to my bot!\n\nSend me a video."
+        "🎬 Welcome to Video Save Bot!\n\n"
+        "Send me a video and I will process it.\n\n"
+        "You can also send an accessible Telegram video link."
     )
 
 
 async def receive_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    video = update.message.video
+
     await update.message.reply_text(
         "✅ Video received!\n\n"
-        f"File ID:\n{update.message.video.file_id}"
+        f"File ID:\n{video.file_id}"
     )
 
 
-telegram_app.add_handler(CommandHandler("start", start))
+async def receive_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text
+
+    if "t.me/" in text:
+        await update.message.reply_text(
+            "🔗 Telegram link received.\n\n"
+            "I can only retrieve videos from chats/channels "
+            "that the bot has legitimate access to."
+        )
+    else:
+        await update.message.reply_text(
+            "Please send me a video or an accessible Telegram video link."
+        )
+
+
+telegram_app.add_handler(
+    CommandHandler("start", start)
+)
+
 telegram_app.add_handler(
     MessageHandler(filters.VIDEO, receive_video)
+)
+
+telegram_app.add_handler(
+    MessageHandler(filters.TEXT & ~filters.COMMAND, receive_text)
 )
 
 
@@ -53,7 +86,6 @@ async def run_telegram():
 
     await telegram_app.updater.start_polling()
 
-    # Keep the Telegram bot running
     await asyncio.Event().wait()
 
 
@@ -68,6 +100,7 @@ if __name__ == "__main__":
         target=start_telegram_thread,
         daemon=True
     )
+
     telegram_thread.start()
 
     port = int(os.environ.get("PORT", 10000))
