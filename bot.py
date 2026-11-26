@@ -1,7 +1,11 @@
 import os
+import asyncio
+import threading
+
 from flask import Flask
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
+from waitress import serve
 
 BOT_TOKEN = "".join(os.environ.get("BOT_TOKEN", "").split())
 
@@ -34,27 +38,44 @@ def home():
     return "Telegram bot is running!"
 
 
+async def run_telegram():
+    print("Starting Telegram bot...")
+    print("Token found:", bool(BOT_TOKEN))
+    print("Token length:", len(BOT_TOKEN))
+
+    await telegram_app.initialize()
+
+    print("Telegram connection successful!")
+
+    await telegram_app.start()
+
+    print("Telegram bot started!")
+
+    await telegram_app.updater.start_polling()
+
+    # Keep the Telegram bot running
+    await asyncio.Event().wait()
+
+
+def start_telegram_thread():
+    asyncio.run(run_telegram())
+
+
 if __name__ == "__main__":
-    import asyncio
-    from waitress import serve
+    print("Starting web server...")
 
-    async def main():
-        print("Starting Telegram bot...")
-        print("Token found:", bool(BOT_TOKEN))
-        print("Token length:", len(BOT_TOKEN))
+    telegram_thread = threading.Thread(
+        target=start_telegram_thread,
+        daemon=True
+    )
+    telegram_thread.start()
 
-        await telegram_app.initialize()
+    port = int(os.environ.get("PORT", 10000))
 
-        print("Telegram connection successful!")
+    print(f"Web server listening on port {port}")
 
-        await telegram_app.start()
-
-        print("Starting web server...")
-
-        serve(
-            app,
-            host="0.0.0.0",
-            port=int(os.environ.get("PORT", 10000))
-        )
-
-    asyncio.run(main())
+    serve(
+        app,
+        host="0.0.0.0",
+        port=port
+    )
