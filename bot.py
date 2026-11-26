@@ -1,27 +1,25 @@
 import os
-from flask import Flask, request
+from flask import Flask
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 
-BOT_TOKEN = os.environ["BOT_TOKEN"]
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "").strip()
 
 app = Flask(__name__)
+
 telegram_app = Application.builder().token(BOT_TOKEN).build()
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "🎬 Welcome to my bot!\n\n"
-        "Send me a video."
+        "🎬 Welcome to my bot!\n\nSend me a video."
     )
 
 
 async def receive_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    video = update.message.video
-
     await update.message.reply_text(
         "✅ Video received!\n\n"
-        "File ID:\n" + video.file_id
+        f"File ID:\n{update.message.video.file_id}"
     )
 
 
@@ -31,27 +29,28 @@ telegram_app.add_handler(
 )
 
 
-@app.route("/", methods=["GET"])
+@app.route("/")
 def home():
     return "Telegram bot is running!"
 
 
-@app.route("/webhook", methods=["POST"])
-async def webhook():
-    data = request.get_json(force=True)
-    update = Update.de_json(data, telegram_app.bot)
-    await telegram_app.process_update(update)
-    return "OK"
-
-
 if __name__ == "__main__":
     import asyncio
+    from waitress import serve
 
     async def main():
+        print("Starting Telegram bot...")
+        print("Token found:", bool(BOT_TOKEN))
+        print("Token length:", len(BOT_TOKEN))
+
         await telegram_app.initialize()
+
+        print("Telegram connection successful!")
+
         await telegram_app.start()
 
-        from waitress import serve
+        print("Starting web server...")
+
         serve(
             app,
             host="0.0.0.0",
